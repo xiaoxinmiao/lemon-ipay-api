@@ -202,6 +202,8 @@ func Prepay(c echo.Context) error {
 	customDto := wxpay.ReqCustomerDto{
 		Key: account.Key,
 	}
+	reqDto.TimeStart = time.Now().UTC().Add(8 * time.Hour).Format("20060102150405")
+	reqDto.TimeExpire = time.Now().UTC().Add(8 * time.Hour).Add(10 * time.Minute).Format("20060102150405")
 	result, err := wxpay.Prepay(reqDto.ReqPrepayDto, &customDto)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, kmodel.Result{Success: false, Error: kmodel.Error{Code: 10004, Message: err.Error()}})
@@ -209,11 +211,11 @@ func Prepay(c echo.Context) error {
 
 	prePayParam := make(map[string]interface{}, 0)
 	prePayParam["package"] = "prepay_id=" + base.ToString(result["prepay_id"])
-	prePayParam["timeStamp"] = base.ToString(time.Now().Unix())
+	prePayParam["timeStamp"] = base.ToString(ChinaDatetime().Unix())
 	prePayParam["nonceStr"] = result["nonce_str"]
 	prePayParam["signType"] = "MD5"
 	prePayParam["appId"] = result["appid"]
-	prePayParam["pay_sign"] = sign.MakeMd5Sign(base.JoinMapObject(prePayParam), account.Key)
+	prePayParam["paySign"] = sign.MakeMd5Sign(base.JoinMapObject(prePayParam), account.Key)
 
 	return c.JSON(http.StatusOK, kmodel.Result{Success: true, Result: prePayParam})
 }

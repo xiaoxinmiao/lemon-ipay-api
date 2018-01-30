@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/labstack/echo"
 	"github.com/relax-space/go-kit/base"
@@ -21,18 +20,17 @@ import (
 	"github.com/relax-space/go-kitt/auth"
 	"github.com/relax-space/lemon-wxmp-sdk/mpAuth"
 	paysdk "github.com/relax-space/lemon-wxpay-sdk"
-	wxpay "github.com/relax-space/lemon-wxpay-sdk"
 )
 
 func NotifyQuery(account *model.WxAccount, outTradeNo string) (result map[string]interface{}, err error) {
 	var reqDto paysdk.ReqQueryDto
-	reqDto.ReqBaseDto = &wxpay.ReqBaseDto{
+	reqDto.ReqBaseDto = &paysdk.ReqBaseDto{
 		AppId:    account.AppId,
 		SubAppId: account.SubAppId,
 		MchId:    account.MchId,
 		SubMchId: account.SubMchId,
 	}
-	customDto := &wxpay.ReqCustomerDto{
+	customDto := &paysdk.ReqCustomerDto{
 		Key: account.Key,
 	}
 	reqDto.OutTradeNo = outTradeNo
@@ -184,27 +182,27 @@ func PrepayReqParam(c echo.Context) (reqDto *ReqPrepayEasyDto, err error) {
 }
 
 func PrepayRespParam(reqDto *ReqPrepayEasyDto, account *model.WxAccount) (prePayParam map[string]interface{}, err error) {
-	reqDto.ReqBaseDto = &wxpay.ReqBaseDto{
+	reqDto.ReqBaseDto = &paysdk.ReqBaseDto{
 		AppId:    account.AppId,
 		SubAppId: account.SubAppId,
 		MchId:    account.MchId,
 		SubMchId: account.SubMchId,
 	}
-	customDto := wxpay.ReqCustomerDto{
+	customDto := paysdk.ReqCustomerDto{
 		Key: account.Key,
 	}
-	result, err := wxpay.Prepay(reqDto.ReqPrepayDto, &customDto)
+	result, err := paysdk.Prepay(reqDto.ReqPrepayDto, &customDto)
 	if err != nil {
 		return
 	}
 
 	prePayParam = make(map[string]interface{}, 0)
 	prePayParam["package"] = "prepay_id=" + base.ToString(result["prepay_id"])
-	prePayParam["timeStamp"] = base.ToString(time.Now().Unix())
+	prePayParam["timeStamp"] = base.ToString(ChinaDatetime().Unix())
 	prePayParam["nonceStr"] = result["nonce_str"]
 	prePayParam["signType"] = "MD5"
 	prePayParam["appId"] = result["appid"]
-	prePayParam["pay_sign"] = sign.MakeMd5Sign(base.JoinMapObject(prePayParam), account.Key)
+	prePayParam["paySign"] = sign.MakeMd5Sign(base.JoinMapObject(prePayParam), account.Key)
 	prePayParam["jwtToken"], _ = auth.NewToken(map[string]interface{}{"type": "ticket"})
 	return
 }
