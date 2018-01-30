@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/labstack/echo"
+	"github.com/relax-space/go-kit/base"
 )
 
 const (
@@ -34,4 +36,9 @@ func SetCookieObj(key string, value interface{}, c echo.Context) {
 	cookie.Path = "/"
 	//cookie.Expires = time.Now().Add(1 * time.Hour)
 	c.SetCookie(cookie)
+}
+
+func ChinaDatetime() (date time.Time) {
+	date = base.GetZoneTime("UTC", time.Now().Add(8*time.Hour))
+	return
 }
