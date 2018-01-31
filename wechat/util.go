@@ -1,13 +1,16 @@
 package wechat
 
 import (
+	"bytes"
 	"encoding/json"
+	"encoding/xml"
+	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"time"
 
 	"github.com/labstack/echo"
-	"github.com/relax-space/go-kit/base"
 )
 
 const (
@@ -39,6 +42,39 @@ func SetCookieObj(key string, value interface{}, c echo.Context) {
 }
 
 func ChinaDatetime() (date time.Time) {
-	date = base.GetZoneTime("UTC", time.Now().Add(8*time.Hour))
+	date = time.Now().UTC().Add(8 * time.Hour)
+	return
+}
+
+func POSTXml(token, url, param string, v interface{}) (resp *http.Response, err error) {
+	b := []byte(param)
+	httpReq, err := http.NewRequest("POST", url, bytes.NewBuffer(b))
+	if err != nil {
+		err = fmt.Errorf("HTTP New Request Error: %s", err)
+		return
+	}
+	httpReq.Header.Set("Content-Type", "application/xml")
+	if token != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	resp, err = (&http.Client{}).Do(httpReq)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		b, _ := ioutil.ReadAll(resp.Body)
+		err = fmt.Errorf("[%d %s]%s", resp.StatusCode, resp.Status, string(b))
+		return
+	}
+	if v != nil {
+		dec := xml.NewDecoder(resp.Body)
+		if err = dec.Decode(&v); err != nil {
+			return
+		}
+	}
+
 	return
 }

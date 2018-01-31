@@ -11,10 +11,11 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/labstack/echo"
 	"github.com/relax-space/go-kit/base"
-	"github.com/relax-space/go-kit/httpreq"
+	"github.com/relax-space/go-kit/data"
 	"github.com/relax-space/go-kit/log"
 	"github.com/relax-space/go-kit/sign"
 	"github.com/relax-space/go-kitt/auth"
@@ -52,8 +53,8 @@ func NotifyBodyParse(body string) (bodyMap map[string]interface{}, eId int64, er
 	return
 }
 
-func NotifyValid(body, signParam, outTradeNo string, totalAmount int64, mapParam map[string]interface{}) (err error) {
-	bodyMap, eId, err := NotifyBodyParse(body)
+func NotifyValid(body, signParam, outTradeNo string, totalAmount int64, dataParam *data.Data) (err error) {
+	subNotifyUrl, rawAttach, eId, err := GetNotifyAttach(body)
 	if err != nil {
 		return
 	}
@@ -64,13 +65,13 @@ func NotifyValid(body, signParam, outTradeNo string, totalAmount int64, mapParam
 
 	//1.valid sign
 	signStr := signParam
+	mapParam := dataParam.DataAttr
 	delete(mapParam, "sign")
-	fmt.Println(base.JoinMapObject(mapParam))
-
 	if !sign.CheckMd5Sign(base.JoinMapObject(mapParam), account.Key, signStr) {
 		err = errors.New("sign valid failure")
 		return
 	}
+	mapParam["attach"] = rawAttach
 	//2.valid data
 	queryMap, err := NotifyQuery(&account, outTradeNo)
 	if err != nil {
@@ -80,12 +81,29 @@ func NotifyValid(body, signParam, outTradeNo string, totalAmount int64, mapParam
 		err = errors.New("amount is exception")
 		return
 	}
+	mapParam["sign"] = signParam
 	//3.send data to sub_mch
-	if subNotifyUrl, ok := bodyMap["sub_notify_url"]; ok {
-		go func(signParam string) {
-			mapParam["sign"] = signParam
-			_, err = httpreq.POST("", subNotifyUrl.(string), mapParam, nil)
-		}(signStr)
+	if len(subNotifyUrl) != 0 {
+		go func(signParam, subNotifyUrl string, dataParam *data.Data) {
+			SubNotify(subNotifyUrl, dataParam.ToXml())
+		}(signStr, subNotifyUrl, dataParam)
+	}
+	return
+}
+
+type SuccessResult struct {
+	XMLName    xml.Name `xml:"xml"`
+	ReturnCode string   `xml:"return_code"`
+	ReturnMsg  string   `xml:"return_msg"`
+}
+
+func SubNotify(subNotifyUrl, xmlParam string) (successResult SuccessResult) {
+	resp, err := POSTXml("", subNotifyUrl, xmlParam, &successResult)
+	if err == nil && resp != nil &&
+		resp.StatusCode == http.StatusOK && successResult.ReturnCode == "SUCCESS" {
+		fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "notify success", xmlParam)
+		fmt.Println(xmlParam)
+		return
 	}
 	return
 }
@@ -204,5 +222,33 @@ func PrepayRespParam(reqDto *ReqPrepayEasyDto, account *model.WxAccount) (prePay
 	prePayParam["appId"] = result["appid"]
 	prePayParam["paySign"] = sign.MakeMd5Sign(base.JoinMapObject(prePayParam), account.Key)
 	prePayParam["jwtToken"], _ = auth.NewToken(map[string]interface{}{"type": "ticket"})
+	return
+}
+
+/*
+e_id,sub_notify_url,attach
+*/
+func SetNotifyAttach(subNotifyUrl, attach string, eId int64) (newAttach string) {
+	newAttach = strconv.FormatInt(eId, 10) + core.NOTIFY_BODY_SEP2 +
+		url.QueryEscape(subNotifyUrl) + core.NOTIFY_BODY_SEP2 +
+		url.QueryEscape(attach)
+	return
+}
+
+/*
+e_id,sub_notify_url,attach
+*/
+func GetNotifyAttach(attach string) (subNotifyUrl, rawAttach string, eId int64, err error) {
+	vs := strings.Split(attach, core.NOTIFY_BODY_SEP2)
+	if len(vs) != 3 {
+		err = errors.New("attach param is missing[e_id,sub_notify_url,attach]")
+		return
+	}
+	eId, err = strconv.ParseInt(vs[0], 10, 64)
+	if err != nil {
+		return
+	}
+	subNotifyUrl, err = url.QueryUnescape(vs[1])
+	rawAttach, err = url.QueryUnescape(vs[2])
 	return
 }

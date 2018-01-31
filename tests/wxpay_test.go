@@ -3,13 +3,14 @@ package tests
 import (
 	"encoding/json"
 	"fmt"
-	"kit/test"
 	"lemon-ipay-api/wechat"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/relax-space/go-kit/test"
 
 	"github.com/labstack/echo"
 	"github.com/relax-space/go-kit/model"
@@ -270,4 +271,18 @@ func Test_NotifyBodyParse(t *testing.T) {
 	fmt.Printf("\n%+v", bodyMap)
 	fmt.Printf("\n%T,%v", eId, eId)
 	test.Ok(t, err)
+}
+
+func Test_SetNotifyAttach(t *testing.T) {
+	subNotifyUrl := "http://baidu.com"
+	attach := "orderNo= 121"
+	eId := int64(10001)
+	newAttach := wechat.SetNotifyAttach(subNotifyUrl, attach, eId)
+	fmt.Println(newAttach)
+}
+
+func Test_GetNotifyAttach(t *testing.T) {
+	attach := "10001||||http%3A%2F%2Fbaidu.com||||orderNo%3D+121"
+	subNotifyUrl, rawAttach, eId, err := wechat.GetNotifyAttach(attach)
+	fmt.Println(subNotifyUrl, rawAttach, eId, err)
 }

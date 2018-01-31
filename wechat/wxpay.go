@@ -202,8 +202,15 @@ func Prepay(c echo.Context) error {
 	customDto := wxpay.ReqCustomerDto{
 		Key: account.Key,
 	}
-	reqDto.TimeStart = time.Now().UTC().Add(8 * time.Hour).Format("20060102150405")
-	reqDto.TimeExpire = time.Now().UTC().Add(8 * time.Hour).Add(10 * time.Minute).Format("20060102150405")
+	/*
+		1.set customer notify_url into attach
+		2.set ipay united notify_url to reqDto
+	*/
+	reqDto.ReqPrepayDto.Attach = SetNotifyAttach(reqDto.NotifyUrl, reqDto.Attach, reqDto.EId)
+	reqDto.ReqPrepayDto.NotifyUrl = fmt.Sprintf("%v/wx/%v", core.Env.HostUrl, "notify")
+
+	reqDto.ReqPrepayDto.TimeStart = ChinaDatetime().Format("20060102150405")
+	reqDto.ReqPrepayDto.TimeExpire = ChinaDatetime().Add(10 * time.Minute).Format("20060102150405")
 	result, err := wxpay.Prepay(reqDto.ReqPrepayDto, &customDto)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, kmodel.Result{Success: false, Error: kmodel.Error{Code: 10004, Message: err.Error()}})
@@ -231,6 +238,7 @@ func Notify(c echo.Context) error {
 	if len(xmlBody) == 0 {
 		return NotifyError(c, "xml is empty")
 	}
+	fmt.Println(string(xmlBody))
 	//1.get dto data
 	var notifyDto model.NotifyWechat
 	err = xml.Unmarshal([]byte(xmlBody), &notifyDto)
@@ -244,10 +252,11 @@ func Notify(c echo.Context) error {
 		return NotifyError(c, err.Error())
 	}
 	//2.valid
-	if err = NotifyValid(notifyDto.Attach, notifyDto.Sign, notifyDto.OutTradeNo, notifyDto.TotalFee, wxData.DataAttr); err != nil {
+	if err = NotifyValid(notifyDto.Attach, notifyDto.Sign, notifyDto.OutTradeNo, notifyDto.TotalFee, wxData); err != nil {
 		return NotifyError(c, err.Error())
 
 	}
+
 	//3.save into data base
 	err = model.NotifyWechat{}.InsertOne(&notifyDto)
 	if err != nil {
