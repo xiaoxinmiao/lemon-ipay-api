@@ -98,7 +98,11 @@ type SuccessResult struct {
 }
 
 func SubNotify(subNotifyUrl, xmlParam string) (successResult SuccessResult) {
-	resp, err := POSTXml("", subNotifyUrl, xmlParam, &successResult)
+	token, err := getToken()
+	if err != nil {
+		return
+	}
+	resp, err := POSTXml(token, subNotifyUrl, xmlParam, &successResult)
 	if err == nil && resp != nil &&
 		resp.StatusCode == http.StatusOK && successResult.ReturnCode == "SUCCESS" {
 		fmt.Println(time.Now().Format("2006-01-02 15:04:05"), "notify success", xmlParam)
