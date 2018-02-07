@@ -16,6 +16,7 @@ import (
 
 	"github.com/relax-space/go-kit/base"
 	"github.com/relax-space/go-kit/data"
+	"github.com/relax-space/go-kit/log"
 	"github.com/relax-space/go-kit/sign"
 
 	wxpay "github.com/relax-space/lemon-wxpay-sdk"
@@ -25,10 +26,20 @@ import (
 )
 
 func Pay(c echo.Context) error {
-	reqDto := ReqPayDto{}
-	if err := c.Bind(&reqDto); err != nil {
+	b, err := ioutil.ReadAll(c.Request().Body)
+	defer c.Request().Body.Close()
+
+	log.Info(fmt.Sprintf("Bind request param:%+v--err:%+v", string(b), err))
+	var reqDto ReqPayDto
+	if err := json.Unmarshal(b, &reqDto); err != nil {
+		log.Error(fmt.Sprintf("err:%+v", err))
 		return c.JSON(http.StatusBadRequest, kmodel.Result{Success: false, Error: kmodel.Error{Code: 10004, Message: err.Error()}})
 	}
+
+	// reqDto := ReqPayDto{}
+	// if err := c.Bind(&reqDto); err != nil {
+	// 	return c.JSON(http.StatusBadRequest, kmodel.Result{Success: false, Error: kmodel.Error{Code: 10004, Message: err.Error()}})
+	// }
 
 	account, err := model.WxAccount{}.Get(reqDto.EId)
 	if err != nil {
