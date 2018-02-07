@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/labstack/echo"
+	"github.com/relax-space/go-kitt/auth"
 )
 
 const (
@@ -76,5 +77,12 @@ func POSTXml(token, url, param string, v interface{}) (resp *http.Response, err 
 		}
 	}
 
+	return
+}
+
+func getToken() (token string, err error) {
+	m := make(map[string]interface{}, 0)
+	m["key"] = "value"
+	token, err = auth.NewToken(m)
 	return
 }

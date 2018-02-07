@@ -10,6 +10,7 @@ import (
 	"lemon-ipay-api/wechat"
 	"net/http"
 	"os"
+	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/go-xorm/xorm"
@@ -22,6 +23,7 @@ var (
 	connEnv     = flag.String("IPAY_CONN", os.Getenv("IPAY_CONN"), "IPAY_CONN")
 	bmappingUrl = flag.String("BMAPPING_URL", os.Getenv("BMAPPING_URL"), "BMAPPING_URL")
 	hostUrl     = flag.String("IPAY_HOST", os.Getenv("IPAY_HOST"), "IPAY_HOST")
+	jwtEnv      = flag.String("JWT_SECRET", os.Getenv("JWT_SECRET"), "JWT_SECRET")
 )
 
 func init() {
@@ -62,20 +64,8 @@ func RegisterApi(e *echo.Echo) {
 		fmt.Println("pong")
 		return c.String(http.StatusOK, "pong")
 	})
-	track := func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			//util.Lang = c.Request().Header["Accept-Language"]
-			return next(c)
-		}
-	}
 
-	v3 := e.Group("/v3", track)
-	v3.POST("/pay", ipay.Pay)
-	v3.POST("/query", ipay.Query)
-	v3.POST("/reverse", ipay.Reverse)
-	v3.POST("/refund", ipay.Refund)
-	v3.POST("/Prepay", ipay.Prepay)
-
+	v3 := e.Group("/v3")
 	v3.GET("/record/:Id", ipay.GetRecord)
 
 	wx := v3.Group("/wx")
@@ -95,5 +85,41 @@ func RegisterApi(e *echo.Echo) {
 	al.POST("/refund", alipay.Refund)
 	al.POST("/prepay", alipay.Prepay)
 	al.POST("/notify", alipay.Notify)
+
+	e.Use(middleware.JWTWithConfig(middleware.JWTConfig{
+		SigningKey: []byte(*jwtEnv),
+		Skipper: func(c echo.Context) bool {
+			ignore := []string{
+				"/ping",
+				"/v3/wx",
+				"/v3/al",
+			}
+			for _, i := range ignore {
+				if strings.HasPrefix(c.Request().URL.Path, i) {
+					return true
+				}
+			}
+
+			return false
+		},
+	}))
+
+	wxEland := v3.Group("/jwt/wx")
+	wxEland.POST("/pay", wechat.Pay)
+	wxEland.POST("/query", wechat.Query)
+	wxEland.POST("/reverse", wechat.Reverse)
+	wxEland.POST("/refund", wechat.Refund)
+	wxEland.POST("/prepay", wechat.Prepay)
+	wxEland.POST("/notify", wechat.Notify)
+	wxEland.GET("/prepayeasy", wechat.PrepayEasy)
+	wxEland.GET("/prepayopenid", wechat.PrepayOpenId)
+
+	alEland := v3.Group("/jwt/al")
+	alEland.POST("/pay", alipay.Pay)
+	alEland.POST("/query", alipay.Query)
+	alEland.POST("/reverse", alipay.Reverse)
+	alEland.POST("/refund", alipay.Refund)
+	alEland.POST("/prepay", alipay.Prepay)
+	alEland.POST("/notify", alipay.Notify)
 
 }
